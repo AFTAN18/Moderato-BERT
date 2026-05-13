@@ -5,17 +5,18 @@
  * 
  * REQUEST LIFECYCLE:
  * Frontend → Express API → Auth Middleware → Validation → NLP Preprocessing
- * → ML Inference (Gemini simulating BERT) → Supabase Storage → Response
+ * → ML Inference (Claude/Gemini simulating BERT) → Supabase Storage → Response
  * 
  * SERVICE COMMUNICATION:
  * - Frontend ↔ Backend: REST over HTTP (same-origin)
- * - Backend → ML Service: Internal HTTP POST to Gemini API
+ * - Backend → ML Service: Claude API (primary) / Gemini API (fallback)
  * - Backend → Database: Supabase JS Client SDK
  */
 
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
@@ -30,7 +31,8 @@ const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
-// ─── AI ENGINE (Gemini simulating BERT multi-label output) ───
+// ─── AI ENGINES ──────────────────────────────────────────────
+const claude = process.env.CLAUDE_API_KEY ? new Anthropic({ apiKey: process.env.CLAUDE_API_KEY }) : null;
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI(process.env.GEMINI_API_KEY) : null;
 
 app.use(express.json());
@@ -78,9 +80,8 @@ app.post("/api/analyze-comment", async (req, res) => {
   const start = Date.now();
 
   try {
-    if (!genAI) throw new Error("AI Engine not initialized. Set GEMINI_API_KEY.");
+    if (!claude && !genAI) throw new Error("No AI engine configured. Set CLAUDE_API_KEY or GEMINI_API_KEY.");
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `You are a toxicity classification engine. Analyze the following text for toxicity.
 Categories: toxic, severe_toxic, obscene, threat, insult, identity_hate.
 Give a confidence score between 0.0 and 1.0 for EACH category.
@@ -89,8 +90,54 @@ Respond with ONLY valid JSON, no markdown, no explanation:
 
 Text: "${cleanText}"`;
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    let responseText = "";
+
+    // Primary: Claude API
+    if (claude) {
+      try {
+        const msg = await claude.messages.create({
+          model: "claude-3-haiku-20240307",
+          max_tokens: 256,
+          messages: [{ role: "user", content: prompt }],
+        });
+        responseText = msg.content[0].type === "text" ? msg.content[0].text : "";
+      } catch (claudeErr: any) {
+        console.log(`Claude failed: ${claudeErr.message?.substring(0, 80)}`);
+      }
+    }
+
+    // Fallback: Gemini API
+    if (!responseText && genAI) {
+      const models = ["gemini-2.0-flash-lite", "gemini-2.0-flash"];
+      for (const modelName of models) {
+        try {
+          const result = await genAI.models.generateContent({ model: modelName, contents: prompt });
+          responseText = result.text || "";
+          if (responseText) break;
+        } catch (gemErr: any) {
+          console.log(`Gemini ${modelName} failed: ${gemErr.message?.substring(0, 80)}`);
+        }
+      }
+    }
+    // Fallback: Local heuristic-based scoring (works without any API keys)
+    if (!responseText) {
+      console.log("All cloud APIs unavailable. Using local NLP heuristic fallback.");
+      const toxicPatterns: Record<string, string[]> = {
+        toxic: ["stupid", "dumb", "idiot", "moron", "shut up", "loser", "pathetic", "suck", "trash", "garbage", "worthless", "disgusting"],
+        severe_toxic: ["die", "kill yourself", "cancer", "burn", "destroy"],
+        obscene: ["ugly", "crap", "damn", "hell", "ass", "wtf", "stfu"],
+        threat: ["kill", "murder", "shoot", "bomb", "attack", "hurt", "punch", "stab"],
+        insult: ["stupid", "idiot", "ugly", "dumb", "moron", "loser", "fool", "clown", "pathetic", "worthless"],
+        identity_hate: ["hate", "racist", "sexist", "homophobic", "bigot"],
+      };
+      const words = cleanText.toLowerCase().split(/\s+/);
+      const localScores: Record<string, number> = {};
+      for (const [label, patterns] of Object.entries(toxicPatterns)) {
+        const matches = words.filter(w => patterns.some(p => w.includes(p))).length;
+        localScores[label] = Math.min(+(matches * 0.35 + (matches > 0 ? 0.15 : 0)).toFixed(4), 0.98);
+      }
+      responseText = JSON.stringify({ scores: localScores });
+    }
     const jsonMatch = responseText.match(/\{.*\}/s);
     if (!jsonMatch) throw new Error("Failed to parse ML response");
 
@@ -146,8 +193,12 @@ Text: "${cleanText}"`;
 
     res.json(response);
   } catch (error: any) {
-    console.error("Inference Error:", error);
-    res.status(500).json({ error: error.message || "Failed to analyze comment" });
+    console.error("Inference Error:", error.message);
+    const msg = error.message || "Failed to analyze comment";
+    const cleanMsg = msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota")
+      ? "API quota exceeded. Please wait a moment and try again."
+      : msg.length > 120 ? msg.substring(0, 120) + "..." : msg;
+    res.status(500).json({ error: cleanMsg });
   }
 });
 
