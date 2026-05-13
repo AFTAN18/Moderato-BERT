@@ -1,29 +1,277 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-brand-bg: #0A0A0A;
-  --color-brand-surface: #0D0D0D;
-  --color-brand-card: #111111;
-  --color-brand-border: #1F1F1F;
+  --color-brand-bg: #09090B;
+  --color-brand-surface: #0C0C0E;
+  --color-brand-card: #111113;
+  --color-brand-card-hover: #161618;
+  --color-brand-border: #1C1C1F;
+  --color-brand-border-subtle: #27272A;
+  --color-brand-accent: #2563EB;
+  --color-brand-accent-hover: #3B82F6;
+  --color-brand-accent-muted: #1E40AF;
 }
+
+/* ─── Base Styles ──────────────────────────────────────── */
 
 body {
-  @apply bg-[#0A0A0A] text-slate-300 antialiased font-sans selection:bg-blue-500/30 selection:text-blue-200 overflow-hidden;
+  background-color: #09090B;
+  color: #cbd5e1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  overflow-x: hidden;
 }
 
+::selection {
+  background: rgba(59, 130, 246, 0.3);
+  color: #bfdbfe;
+}
+
+/* ─── Custom Scrollbar ─────────────────────────────────── */
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-800 rounded-full border-2 border-[#0A0A0A] hover:bg-slate-700;
+  background: #1e293b;
+  border-radius: 9999px;
 }
 
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* ─── Animations ───────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s infinite;
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease infinite;
+}
+
+/* ─── Skeleton Loading ─────────────────────────────────── */
+
+.skeleton {
+  background: linear-gradient(90deg, #111113 25%, #1a1a1d 50%, #111113 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+
+/* ─── Glass Effect ─────────────────────────────────────── */
+
+.glass {
+  background: rgba(17, 17, 19, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ─── Card Styles ──────────────────────────────────────── */
+
+.card {
+  background-color: #111113;
+  border: 1px solid #1C1C1F;
+  border-radius: 0.75rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  border-color: rgba(37, 99, 235, 0.12);
+}
+
+.card-interactive {
+  background-color: #111113;
+  border: 1px solid #1C1C1F;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.card-interactive:hover {
+  background-color: #161618;
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.05), 0 8px 32px -8px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Button Variants ──────────────────────────────────── */
+
+.btn-primary {
+  padding: 0.625rem 1.25rem;
+  background-color: #2563EB;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(30, 64, 175, 0.2);
+  transition: all 0.15s ease;
+}
+
+.btn-primary:hover {
+  background-color: #3B82F6;
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary:disabled:active {
+  transform: none;
+}
+
+.btn-secondary {
+  padding: 0.625rem 1.25rem;
+  background-color: #111113;
+  color: #cbd5e1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  border: 1px solid #1C1C1F;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background-color: #161618;
+  color: white;
+  border-color: #27272A;
+}
+
+.btn-secondary:active {
+  transform: scale(0.97);
+}
+
+.btn-ghost {
+  padding: 0.5rem 1rem;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  transition: all 0.15s ease;
+}
+
+.btn-ghost:hover {
+  background-color: #111113;
+  color: white;
+}
+
+/* ─── Input Styles ─────────────────────────────────────── */
+
+.input {
+  width: 100%;
+  background-color: #09090B;
+  border: 1px solid #1C1C1F;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  color: white;
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input::placeholder {
+  color: #475569;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+/* ─── Status Badges ────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-block {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.badge-flag {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.badge-allow {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.badge-high {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.badge-medium {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.badge-low {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* ─── Responsive ───────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .sidebar-desktop {
+    display: none;
+  }
+}
