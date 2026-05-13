@@ -1,0 +1,8 @@
+{
+  "name": "Moderato BERT - Real-Time Content Moderation API",
+  "description": "Enterprise-grade content moderation platform using BERT transformers for multi-label toxicity detection, real-time analytics, and automated moderation workflows.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
