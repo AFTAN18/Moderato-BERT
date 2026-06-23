@@ -12,6 +12,13 @@ import express from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
+import {
+  getRealAnalytics,
+  getRealExecutiveDashboard,
+  getRealHistory,
+  getRealModelMetrics,
+  getRealSettings,
+} from "./realData";
 
 const app = express();
 
@@ -232,108 +239,47 @@ Text: "${cleanText}"`;
 
 // ─── GET /api/analytics ───────────────────────────────────────
 app.get("/api/analytics", async (_req, res) => {
-  res.json({
-    total_analyzed: 28304,
-    positive_ratio: 0.642,
-    negative_ratio: 0.158,
-    neutral_ratio: 0.2,
-    satisfaction_index: 78.4,
-    latency_avg_ms: 114,
-    sentiment_distribution: { positive: 18171, negative: 4472, neutral: 5661 },
-    intent_distribution: {
-      product_feedback: 12450, support_request: 4230, inquiry: 3890,
-      complaint: 3120, feature_request: 2450, purchase_intent: 1150,
-      recommendation: 840, churn_risk: 174,
-    },
-    recent_trend: "up",
-    daily_stats: [
-      { date: "May 7", count: 880, positive: 540, negative: 140, neutral: 200, avg_latency: 112 },
-      { date: "May 8", count: 950, positive: 610, negative: 160, neutral: 180, avg_latency: 115 },
-      { date: "May 9", count: 1120, positive: 750, negative: 150, neutral: 220, avg_latency: 108 },
-      { date: "May 10", count: 1050, positive: 680, negative: 170, neutral: 200, avg_latency: 121 },
-      { date: "May 11", count: 1250, positive: 810, negative: 190, neutral: 250, avg_latency: 118 },
-      { date: "May 12", count: 1180, positive: 760, negative: 180, neutral: 240, avg_latency: 114 },
-      { date: "May 13", count: 1490, positive: 980, negative: 210, neutral: 300, avg_latency: 110 },
-    ],
-  });
+  try {
+    res.json(await getRealAnalytics(supabase));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load analytics" });
+  }
 });
 
 // ─── GET /api/history ─────────────────────────────────────────
-app.get("/api/history", async (_req, res) => {
-  res.json([
-    { id: 1, text: "I absolutely love the new analytics dashboard, it makes my daily reporting so much faster!", sentiment: "positive", primary_intent: "product_feedback", insight_action: "MONITOR", sentiment_scores: { positive: 0.96, neutral: 0.03, negative: 0.01 }, intent_scores: { product_feedback: 0.88, recommendation: 0.45 }, topics: ["Analytics Dashboard", "Reporting"], keywords: ["love", "faster"], latency_ms: 123, timestamp: "2025-05-13T14:22:00Z" },
-    { id: 2, text: "The app keeps crashing when I try to export my data to CSV. Very frustrating.", sentiment: "negative", primary_intent: "complaint", insight_action: "ESCALATE", sentiment_scores: { positive: 0.02, neutral: 0.12, negative: 0.86 }, intent_scores: { complaint: 0.92, support_request: 0.75 }, topics: ["App Crash", "CSV Export"], keywords: ["crashing", "frustrating"], latency_ms: 145, timestamp: "2025-05-13T14:18:00Z" },
-    { id: 3, text: "Can you tell me if the enterprise plan includes custom SSO integrations?", sentiment: "neutral", primary_intent: "inquiry", insight_action: "ENGAGE", sentiment_scores: { positive: 0.15, neutral: 0.82, negative: 0.03 }, intent_scores: { inquiry: 0.94, purchase_intent: 0.65 }, topics: ["Enterprise Plan", "SSO"], keywords: ["custom SSO", "integrations"], latency_ms: 112, timestamp: "2025-05-13T14:15:00Z" },
-    { id: 4, text: "I've had enough of these constant billing issues. Cancel my subscription immediately.", sentiment: "negative", primary_intent: "churn_risk", insight_action: "ESCALATE", sentiment_scores: { positive: 0.01, neutral: 0.04, negative: 0.95 }, intent_scores: { churn_risk: 0.98, complaint: 0.85 }, topics: ["Billing", "Subscription Cancellation"], keywords: ["cancel", "billing issues"], latency_ms: 134, timestamp: "2025-05-13T14:10:00Z" },
-    { id: 5, text: "Would be great to have a dark mode option in the mobile app.", sentiment: "positive", primary_intent: "feature_request", insight_action: "MONITOR", sentiment_scores: { positive: 0.75, neutral: 0.22, negative: 0.03 }, intent_scores: { feature_request: 0.91, product_feedback: 0.65 }, topics: ["Dark Mode", "Mobile App"], keywords: ["dark mode", "great"], latency_ms: 98, timestamp: "2025-05-13T13:58:00Z" },
-  ]);
+app.get("/api/history", async (req, res) => {
+  try {
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 20);
+    res.json(await getRealHistory(supabase, page, limit));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load history" });
+  }
 });
 
 // ─── GET /api/model-metrics ───────────────────────────────────
 app.get("/api/model-metrics", async (_req, res) => {
-  res.json({
-    current: { model_version: "sentiment-bert-v3.0", accuracy: 0.924, precision_score: 0.912, recall: 0.895, f1_score: 0.903, total_inferences: 28304, avg_latency_ms: 114, recorded_at: new Date().toISOString() },
-    history: [
-      { model_version: "v2.0", accuracy: 0.852, precision_score: 0.841, recall: 0.823, f1_score: 0.832, total_inferences: 12500, avg_latency_ms: 145, recorded_at: "2025-02-01" },
-      { model_version: "v2.5", accuracy: 0.887, precision_score: 0.875, recall: 0.862, f1_score: 0.868, total_inferences: 18200, avg_latency_ms: 132, recorded_at: "2025-03-15" },
-      { model_version: "v2.8", accuracy: 0.905, precision_score: 0.892, recall: 0.881, f1_score: 0.886, total_inferences: 24100, avg_latency_ms: 125, recorded_at: "2025-04-10" },
-      { model_version: "v3.0", accuracy: 0.924, precision_score: 0.912, recall: 0.895, f1_score: 0.903, total_inferences: 28304, avg_latency_ms: 114, recorded_at: "2025-05-13" },
-    ],
-    roc_auc: { positive: 0.965, negative: 0.972, neutral: 0.914, purchase_intent: 0.935, complaint: 0.952, feature_request: 0.921, churn_risk: 0.988 },
-  });
+  try {
+    res.json(await getRealModelMetrics(supabase));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load model metrics" });
+  }
 });
 
 // ─── GET /api/executive-dashboard ─────────────────────────────
 app.get("/api/executive-dashboard", async (_req, res) => {
-  res.json({
-    health_score: 82, satisfaction_index: 78.4, purchase_interest_index: 64,
-    pain_points: [
-      { topic: "API Rate Limits", count: 1245, sentiment_avg: 0.15 },
-      { topic: "Billing Discrepancies", count: 832, sentiment_avg: 0.08 },
-      { topic: "Mobile App Crashes", count: 654, sentiment_avg: 0.12 },
-      { topic: "Documentation Sync", count: 421, sentiment_avg: 0.35 },
-    ],
-    trending_topics: [
-      { topic: "New UI Update", count: 2150, trend: "up" },
-      { topic: "SSO Integration", count: 1420, trend: "up" },
-      { topic: "Pricing Tier Changes", count: 980, trend: "down" },
-      { topic: "Data Export", count: 750, trend: "stable" },
-    ],
-    top_concerns: [
-      { text: "We need higher API limits for the enterprise tier. Current limits are breaking our workflows.", sentiment: "negative", intent: "feature_request" },
-      { text: "My invoice is showing charges for seats we removed two months ago.", sentiment: "negative", intent: "complaint" },
-      { text: "The app just closes when I try to upload a profile picture on Android 14.", sentiment: "negative", intent: "complaint" },
-    ],
-    improvement_suggestions: [
-      "Increase API rate limits for enterprise plans",
-      "Add dark mode support to the mobile app",
-      "Provide more granular role-based access control (RBAC)",
-      "Improve CSV export performance for large datasets",
-    ],
-    sentiment_trend: [
-      { date: "Mon", positive: 65, negative: 15, neutral: 20 },
-      { date: "Tue", positive: 68, negative: 14, neutral: 18 },
-      { date: "Wed", positive: 62, negative: 18, neutral: 20 },
-      { date: "Thu", positive: 70, negative: 12, neutral: 18 },
-      { date: "Fri", positive: 72, negative: 10, neutral: 18 },
-      { date: "Sat", positive: 75, negative: 8, neutral: 17 },
-      { date: "Sun", positive: 78, negative: 7, neutral: 15 },
-    ],
-  });
+  try {
+    res.json(await getRealExecutiveDashboard(supabase));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load executive dashboard" });
+  }
 });
 
 // ─── PATCH /api/settings ──────────────────────────────────────
 app.patch("/api/settings", async (req, res) => {
   const settings = req.body;
-  res.json({
-    user_id: "demo-user",
-    theme: settings.theme || "dark",
-    email_notifications: settings.email_notifications ?? true,
-    analysis_depth: settings.analysis_depth || "standard",
-    negative_alert_threshold: settings.negative_alert_threshold ?? 75,
-    churn_risk_threshold: settings.churn_risk_threshold ?? 40,
-    custom_rules: settings.custom_rules || {},
-  });
+  const current = await getRealSettings(supabase);
+  res.json({ ...current, ...settings });
 });
 
 // ─── POST /api/feedback/correct ───────────────────────────────
