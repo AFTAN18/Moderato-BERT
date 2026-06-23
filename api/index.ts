@@ -1,49 +1,55 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- * INSIGHTAI — EXPRESS BACKEND SERVER
+ * MODERATO-BERT — VERCEL SERVERLESS API HANDLER
  * ═══════════════════════════════════════════════════════════════
- * 
- * REQUEST LIFECYCLE:
- * Frontend → Express API → Auth Middleware → Validation → NLP Preprocessing
- * → ML Inference (Claude/Gemini simulating BERT) → Supabase Storage → Response
+ *
+ * This file is the Vercel entry point for all /api/* routes.
+ * It mirrors the routes in server.ts but without the Vite dev server,
+ * so it works as a Vercel serverless function.
  */
 
 import express from "express";
-import path from "path";
-import { createServer as createViteServer } from "vite";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
-import * as dotenv from "dotenv";
-
-dotenv.config();
 
 const app = express();
-const PORT = 3000;
 
 // ─── SUPABASE CLIENT ─────────────────────────────────────────
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase =
+  supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 // ─── AI ENGINES ──────────────────────────────────────────────
-const claude = process.env.CLAUDE_API_KEY ? new Anthropic({ apiKey: process.env.CLAUDE_API_KEY }) : null;
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+const claude = process.env.CLAUDE_API_KEY
+  ? new Anthropic({ apiKey: process.env.CLAUDE_API_KEY })
+  : null;
+const genAI = process.env.GEMINI_API_KEY
+  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  : null;
 
 app.use(express.json());
+
+// ─── CORS for Vercel ──────────────────────────────────────────
+app.use((_req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  next();
+});
 
 // ─── NLP PREPROCESSING PIPELINE ──────────────────────────────
 function preprocessText(text: string): string {
   return text
     .toLowerCase()
-    .replace(/<[^>]*>?/gm, "")           // Strip HTML
-    .replace(/(?:https?|ftp):\/\/[\n\S]+/g, "") // Remove URLs
-    .replace(/[^\w\s.,!?'-]/g, " ")       // Clean special chars
-    .replace(/\s+/g, " ")                 // Normalize whitespace
+    .replace(/<[^>]*>?/gm, "")
+    .replace(/(?:https?|ftp):\/\/[\n\S]+/g, "")
+    .replace(/[^\w\s.,!?'-]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-// ─── INSIGHT CALCULATORS ─────────────────────────────────────
 function calculateSentiment(scores: Record<string, number>): string {
   let maxScore = -1;
   let bestSentiment = "neutral";
@@ -56,9 +62,9 @@ function calculateSentiment(scores: Record<string, number>): string {
   return bestSentiment;
 }
 
-function calculateAction(intent: string, sentiment: string): string {
-  if (intent === 'churn_risk' || intent === 'complaint') return "ESCALATE";
-  if (intent === 'inquiry' || intent === 'support_request') return "ENGAGE";
+function calculateAction(intent: string, _sentiment: string): string {
+  if (intent === "churn_risk" || intent === "complaint") return "ESCALATE";
+  if (intent === "inquiry" || intent === "support_request") return "ENGAGE";
   return "MONITOR";
 }
 
@@ -94,7 +100,6 @@ Text: "${cleanText}"`;
 
     let responseText = "";
 
-    // Primary: Claude API
     if (claude) {
       try {
         const msg = await claude.messages.create({
@@ -108,12 +113,14 @@ Text: "${cleanText}"`;
       }
     }
 
-    // Fallback: Gemini API
     if (!responseText && genAI) {
-      const models = ["gemini-2.0-flash-lite", "gemini-2.0-flash"];
+      const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite"];
       for (const modelName of models) {
         try {
-          const result = await genAI.models.generateContent({ model: modelName, contents: prompt });
+          const result = await genAI.models.generateContent({
+            model: modelName,
+            contents: prompt,
+          });
           responseText = result.text || "";
           if (responseText) break;
         } catch (gemErr: any) {
@@ -122,33 +129,28 @@ Text: "${cleanText}"`;
       }
     }
 
-    // Fallback: Local heuristic-based scoring
+    // Heuristic fallback when all cloud APIs unavailable
     if (!responseText) {
-      console.log("All cloud APIs unavailable. Using local NLP heuristic fallback.");
       const posWords = ["good", "great", "excellent", "love", "awesome", "perfect", "recommend"];
       const negWords = ["bad", "terrible", "awful", "hate", "broken", "refund", "cancel", "worst", "issue"];
       const words = cleanText.toLowerCase().split(/\s+/);
-      
-      const posMatches = words.filter(w => posWords.some(p => w.includes(p))).length;
-      const negMatches = words.filter(w => negWords.some(p => w.includes(p))).length;
-      
+      const posMatches = words.filter((w) => posWords.some((p) => w.includes(p))).length;
+      const negMatches = words.filter((w) => negWords.some((p) => w.includes(p))).length;
       const posScore = Math.min(posMatches * 0.4 + 0.1, 0.95);
       const negScore = Math.min(negMatches * 0.4 + 0.1, 0.95);
       const neuScore = Math.max(0.1, 1.0 - posScore - negScore);
-
-      const churnScore = words.some(w => w.includes("cancel") || w.includes("refund")) ? 0.85 : 0.05;
+      const churnScore = words.some((w) => w.includes("cancel") || w.includes("refund")) ? 0.85 : 0.05;
       const complaintScore = negMatches > 0 ? Math.min(negScore + 0.2, 0.95) : 0.1;
-      
       responseText = JSON.stringify({
         sentiment_scores: { positive: posScore, negative: negScore, neutral: neuScore },
-        intent_scores: { 
-          purchase_intent: 0.1, complaint: complaintScore, inquiry: 0.1, 
-          support_request: 0.1, product_feedback: 0.2, feature_request: 0.1, 
-          churn_risk: churnScore, recommendation: posScore 
+        intent_scores: {
+          purchase_intent: 0.1, complaint: complaintScore, inquiry: 0.1,
+          support_request: 0.1, product_feedback: 0.2, feature_request: 0.1,
+          churn_risk: churnScore, recommendation: posScore,
         },
         topics: ["Product Quality", "Customer Experience"],
         keywords: words.slice(0, 3),
-        discourse_summary: "Customer provided basic feedback via heuristic fallback."
+        discourse_summary: "Customer provided feedback (heuristic fallback).",
       });
     }
 
@@ -158,9 +160,8 @@ Text: "${cleanText}"`;
     const parsed = JSON.parse(jsonMatch[0]);
     const sentiment_scores = parsed.sentiment_scores || { positive: 0, negative: 0, neutral: 1 };
     const intent_scores = parsed.intent_scores || {};
-    
     const sentiment = calculateSentiment(sentiment_scores);
-    
+
     let primary_intent = "product_feedback";
     let max_intent_score = -1;
     for (const [intent, score] of Object.entries(intent_scores)) {
@@ -182,28 +183,22 @@ Text: "${cleanText}"`;
       nlp: {
         topics: parsed.topics || [],
         keywords: parsed.keywords || [],
-        discourse_summary: parsed.discourse_summary || ""
+        discourse_summary: parsed.discourse_summary || "",
       },
       latency_ms: latency,
       timestamp: new Date().toISOString(),
       original_text: text,
     };
 
-    // Store in Supabase if configured
     if (supabase) {
       try {
         const { data: record } = await supabase
           .from("customer_feedback_analysis")
           .insert([{
-            customer_text: text,
-            cleaned_text: cleanText,
-            sentiment,
-            sentiment_score: sentiment_scores[sentiment],
-            primary_intent,
-            intent_confidence: max_intent_score,
-            insight_action: action,
-            extracted_topics: parsed.topics || [],
-            keywords: parsed.keywords || [],
+            customer_text: text, cleaned_text: cleanText, sentiment,
+            sentiment_score: sentiment_scores[sentiment], primary_intent,
+            intent_confidence: max_intent_score, insight_action: action,
+            extracted_topics: parsed.topics || [], keywords: parsed.keywords || [],
             discourse_summary: parsed.discourse_summary || "",
             processing_latency: latency,
           }])
@@ -211,16 +206,13 @@ Text: "${cleanText}"`;
           .single();
 
         if (record) {
-          const labelRows = [];
-          for (const [l, s] of Object.entries(sentiment_scores)) {
-            labelRows.push({ analysis_id: record.id, label_type: 'sentiment', label_name: l, confidence_score: s });
-          }
-          for (const [l, s] of Object.entries(intent_scores)) {
-            labelRows.push({ analysis_id: record.id, label_type: 'intent', label_name: l, confidence_score: s });
-          }
-          if (labelRows.length > 0) {
+          const labelRows: any[] = [];
+          for (const [l, s] of Object.entries(sentiment_scores))
+            labelRows.push({ analysis_id: record.id, label_type: "sentiment", label_name: l, confidence_score: s });
+          for (const [l, s] of Object.entries(intent_scores))
+            labelRows.push({ analysis_id: record.id, label_type: "intent", label_name: l, confidence_score: s });
+          if (labelRows.length > 0)
             await supabase.from("sentiment_intent_labels").insert(labelRows);
-          }
         }
       } catch (dbErr) {
         console.error("DB storage error:", dbErr);
@@ -229,11 +221,11 @@ Text: "${cleanText}"`;
 
     res.json(response);
   } catch (error: any) {
-    console.error("Inference Error:", error.message);
     const msg = error.message || "Failed to analyze feedback";
-    const cleanMsg = msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota")
-      ? "API quota exceeded. Please wait a moment and try again."
-      : msg.length > 120 ? msg.substring(0, 120) + "..." : msg;
+    const cleanMsg =
+      msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota")
+        ? "API quota exceeded. Please wait a moment and try again."
+        : msg.length > 120 ? msg.substring(0, 120) + "..." : msg;
     res.status(500).json({ error: cleanMsg });
   }
 });
@@ -244,19 +236,14 @@ app.get("/api/analytics", async (_req, res) => {
     total_analyzed: 28304,
     positive_ratio: 0.642,
     negative_ratio: 0.158,
-    neutral_ratio: 0.200,
+    neutral_ratio: 0.2,
     satisfaction_index: 78.4,
     latency_avg_ms: 114,
     sentiment_distribution: { positive: 18171, negative: 4472, neutral: 5661 },
     intent_distribution: {
-      product_feedback: 12450,
-      support_request: 4230,
-      inquiry: 3890,
-      complaint: 3120,
-      feature_request: 2450,
-      purchase_intent: 1150,
-      recommendation: 840,
-      churn_risk: 174,
+      product_feedback: 12450, support_request: 4230, inquiry: 3890,
+      complaint: 3120, feature_request: 2450, purchase_intent: 1150,
+      recommendation: 840, churn_risk: 174,
     },
     recent_trend: "up",
     daily_stats: [
@@ -285,16 +272,7 @@ app.get("/api/history", async (_req, res) => {
 // ─── GET /api/model-metrics ───────────────────────────────────
 app.get("/api/model-metrics", async (_req, res) => {
   res.json({
-    current: {
-      model_version: "sentiment-bert-v3.0",
-      accuracy: 0.924,
-      precision_score: 0.912,
-      recall: 0.895,
-      f1_score: 0.903,
-      total_inferences: 28304,
-      avg_latency_ms: 114,
-      recorded_at: new Date().toISOString(),
-    },
+    current: { model_version: "sentiment-bert-v3.0", accuracy: 0.924, precision_score: 0.912, recall: 0.895, f1_score: 0.903, total_inferences: 28304, avg_latency_ms: 114, recorded_at: new Date().toISOString() },
     history: [
       { model_version: "v2.0", accuracy: 0.852, precision_score: 0.841, recall: 0.823, f1_score: 0.832, total_inferences: 12500, avg_latency_ms: 145, recorded_at: "2025-02-01" },
       { model_version: "v2.5", accuracy: 0.887, precision_score: 0.875, recall: 0.862, f1_score: 0.868, total_inferences: 18200, avg_latency_ms: 132, recorded_at: "2025-03-15" },
@@ -308,31 +286,29 @@ app.get("/api/model-metrics", async (_req, res) => {
 // ─── GET /api/executive-dashboard ─────────────────────────────
 app.get("/api/executive-dashboard", async (_req, res) => {
   res.json({
-    health_score: 82,
-    satisfaction_index: 78.4,
-    purchase_interest_index: 64,
+    health_score: 82, satisfaction_index: 78.4, purchase_interest_index: 64,
     pain_points: [
       { topic: "API Rate Limits", count: 1245, sentiment_avg: 0.15 },
       { topic: "Billing Discrepancies", count: 832, sentiment_avg: 0.08 },
       { topic: "Mobile App Crashes", count: 654, sentiment_avg: 0.12 },
-      { topic: "Documentation Sync", count: 421, sentiment_avg: 0.35 }
+      { topic: "Documentation Sync", count: 421, sentiment_avg: 0.35 },
     ],
     trending_topics: [
       { topic: "New UI Update", count: 2150, trend: "up" },
       { topic: "SSO Integration", count: 1420, trend: "up" },
       { topic: "Pricing Tier Changes", count: 980, trend: "down" },
-      { topic: "Data Export", count: 750, trend: "stable" }
+      { topic: "Data Export", count: 750, trend: "stable" },
     ],
     top_concerns: [
       { text: "We need higher API limits for the enterprise tier. Current limits are breaking our workflows.", sentiment: "negative", intent: "feature_request" },
       { text: "My invoice is showing charges for seats we removed two months ago.", sentiment: "negative", intent: "complaint" },
-      { text: "The app just closes when I try to upload a profile picture on Android 14.", sentiment: "negative", intent: "complaint" }
+      { text: "The app just closes when I try to upload a profile picture on Android 14.", sentiment: "negative", intent: "complaint" },
     ],
     improvement_suggestions: [
       "Increase API rate limits for enterprise plans",
       "Add dark mode support to the mobile app",
       "Provide more granular role-based access control (RBAC)",
-      "Improve CSV export performance for large datasets"
+      "Improve CSV export performance for large datasets",
     ],
     sentiment_trend: [
       { date: "Mon", positive: 65, negative: 15, neutral: 20 },
@@ -341,8 +317,8 @@ app.get("/api/executive-dashboard", async (_req, res) => {
       { date: "Thu", positive: 70, negative: 12, neutral: 18 },
       { date: "Fri", positive: 72, negative: 10, neutral: 18 },
       { date: "Sat", positive: 75, negative: 8, neutral: 17 },
-      { date: "Sun", positive: 78, negative: 7, neutral: 15 }
-    ]
+      { date: "Sun", positive: 78, negative: 7, neutral: 15 },
+    ],
   });
 });
 
@@ -369,26 +345,14 @@ app.post("/api/feedback/correct", async (req, res) => {
   res.json({ success: true, message: "Feedback insight corrected" });
 });
 
-// ─── VITE DEV SERVER ──────────────────────────────────────────
-async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 InsightAI API running at http://localhost:${PORT}`);
-    console.log(`📡 Architecture: Express + Vite + Gemini/Claude AI`);
+// ─── Health check ─────────────────────────────────────────────
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    ai: claude ? "claude" : genAI ? "gemini" : "heuristic",
+    db: supabase ? "connected" : "not configured",
+    timestamp: new Date().toISOString(),
   });
-}
+});
 
-startServer();
+export default app;
