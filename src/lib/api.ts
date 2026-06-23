@@ -1,18 +1,4 @@
-/**
- * API CLIENT SERVICE
- * 
- * Centralized HTTP client for all backend communication.
- * 
- * Flow: Component → useApi hook → apiClient → Express Backend → Response
- * 
- * Features:
- * - Automatic error handling
- * - Request/response typing
- * - Auth token injection (when Supabase is configured)
- * - Retry logic for transient failures
- */
-
-import type { AnalysisResult, AnalyticsData, HistoryEntry, ModelPerformanceData, UserSettings } from '../types';
+import type { AnalysisResult, AnalyticsData, HistoryEntry, ModelPerformanceData, UserSettings, ExecutiveDashboard } from '../types';
 
 class ApiClient {
   private baseUrl: string;
@@ -41,11 +27,11 @@ class ApiClient {
   }
 
   /**
-   * POST /api/analyze-comment
+   * POST /api/analyze-feedback
    * Sends text to backend → NLP preprocessing → ML inference → DB storage → response
    */
-  async analyzeComment(text: string): Promise<AnalysisResult> {
-    return this.request<AnalysisResult>('/api/analyze-comment', {
+  async analyzeFeedback(text: string): Promise<AnalysisResult> {
+    return this.request<AnalysisResult>('/api/analyze-feedback', {
       method: 'POST',
       body: JSON.stringify({ text }),
     });
@@ -53,7 +39,7 @@ class ApiClient {
 
   /**
    * GET /api/history
-   * Retrieves paginated prediction history for the authenticated user
+   * Retrieves paginated analysis history for the authenticated user
    */
   async getHistory(page = 1, limit = 20): Promise<HistoryEntry[]> {
     return this.request<HistoryEntry[]>(`/api/history?page=${page}&limit=${limit}`);
@@ -68,8 +54,16 @@ class ApiClient {
   }
 
   /**
+   * GET /api/executive-dashboard
+   * High-level KPIs and trending topics
+   */
+  async getExecutiveDashboard(): Promise<ExecutiveDashboard> {
+    return this.request<ExecutiveDashboard>('/api/executive-dashboard');
+  }
+
+  /**
    * GET /api/model-metrics
-   * BERT model performance metrics over time
+   * BERT sentiment model performance metrics over time
    */
   async getModelMetrics(): Promise<ModelPerformanceData> {
     return this.request<ModelPerformanceData>('/api/model-metrics');
@@ -87,13 +81,13 @@ class ApiClient {
   }
 
   /**
-   * POST /api/moderation/override
-   * Human moderator overrides an AI decision
+   * POST /api/feedback/correct
+   * Human analyst overrides an AI sentiment decision
    */
-  async overrideModeration(predictionId: number, newAction: string, reason: string): Promise<void> {
-    return this.request('/api/moderation/override', {
+  async correctFeedback(analysisId: number, correctedSentiment: string, reason: string): Promise<void> {
+    return this.request('/api/feedback/correct', {
       method: 'POST',
-      body: JSON.stringify({ prediction_id: predictionId, new_action: newAction, reason }),
+      body: JSON.stringify({ analysis_id: analysisId, corrected_sentiment: correctedSentiment, reason }),
     });
   }
 }

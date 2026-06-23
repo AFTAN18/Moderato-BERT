@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, Activity, Sparkles, Terminal, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Send, Activity, Sparkles, Terminal, Clock, AlertTriangle, MessageSquare, Tag } from 'lucide-react';
 import { cn, formatScore } from '@/src/lib/utils';
 import { api } from '@/src/lib/api';
 import type { AnalysisResult } from '@/src/types';
@@ -18,7 +18,7 @@ export default function AnalysisDashboard() {
     setError('');
 
     try {
-      const data = await api.analyzeComment(text);
+      const data = await api.analyzeFeedback(text);
       setResult(data);
     } catch (err: any) {
       setError(err.message);
@@ -27,16 +27,22 @@ export default function AnalysisDashboard() {
     }
   };
 
-  const actionColor = (action?: string) => {
-    if (action === 'BLOCK') return 'text-red-400';
-    if (action === 'FLAG') return 'text-amber-400';
-    return 'text-emerald-400';
+  const sentimentColor = (sentiment?: string) => {
+    if (sentiment === 'negative') return 'text-red-400';
+    if (sentiment === 'positive') return 'text-emerald-400';
+    return 'text-slate-400';
   };
 
-  const actionBg = (action?: string) => {
-    if (action === 'BLOCK') return 'bg-red-500/10 border-red-500/20';
-    if (action === 'FLAG') return 'bg-amber-500/10 border-amber-500/20';
-    return 'bg-emerald-500/10 border-emerald-500/20';
+  const sentimentBg = (sentiment?: string) => {
+    if (sentiment === 'negative') return 'bg-red-500/10 border-red-500/20';
+    if (sentiment === 'positive') return 'bg-emerald-500/10 border-emerald-500/20';
+    return 'bg-slate-500/10 border-slate-500/20';
+  };
+
+  const sentimentBarColor = (sentiment: string) => {
+    if (sentiment === 'negative') return 'bg-red-500';
+    if (sentiment === 'positive') return 'bg-emerald-500';
+    return 'bg-slate-500';
   };
 
   return (
@@ -47,19 +53,19 @@ export default function AnalysisDashboard() {
           <div className="card p-6 flex flex-col min-h-[360px]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-semibold flex items-center gap-2 text-sm">
-                <Activity className="w-4 h-4 text-blue-400" />
-                Live Inference Input
+                <Activity className="w-4 h-4 text-indigo-400" />
+                Customer Feedback Analysis
               </h2>
               <span className="text-[10px] text-slate-500 bg-brand-bg px-2.5 py-1 rounded-md border border-brand-border font-mono">
-                BERT-BASE-UNCASED-V2.4
+                SENTIMENT-BERT-V3.0
               </span>
             </div>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) handleAnalyze(); }}
-              placeholder="Type or paste comment content here for real-time toxicity scoring..."
-              className="flex-1 bg-transparent border border-brand-border rounded-lg p-4 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/15 resize-none font-sans leading-relaxed text-sm"
+              placeholder="Paste customer feedback, review, support ticket, or survey response..."
+              className="flex-1 bg-transparent border border-brand-border rounded-lg p-4 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/15 resize-none font-sans leading-relaxed text-sm"
               maxLength={5000}
             />
             <div className="mt-4 flex items-center justify-between">
@@ -73,9 +79,9 @@ export default function AnalysisDashboard() {
               </div>
               <button onClick={handleAnalyze} disabled={!text.trim() || isAnalyzing} className="btn-primary flex items-center gap-2">
                 {isAnalyzing ? (
-                  <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing...</>
+                  <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Analyzing...</>
                 ) : (
-                  <><Send className="w-3.5 h-3.5" /> Analyze</>
+                  <><Send className="w-3.5 h-3.5" /> Analyze Feedback</>
                 )}
               </button>
             </div>
@@ -83,25 +89,54 @@ export default function AnalysisDashboard() {
 
           {/* Quick Stats */}
           <div className="grid grid-cols-3 gap-4">
-            <div className="card p-4">
-              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1.5">Peak Score</p>
-              <p className="text-xl text-white font-mono font-bold">
-                {result ? formatScore(Math.max(...Object.values(result.scores))) : '--'}
+            <div className={cn("card p-4 border-l-2", result ? sentimentBg(result.sentiment) : '')}>
+              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1.5">Sentiment</p>
+              <p className={cn("text-xl font-mono font-bold capitalize", result ? sentimentColor(result.sentiment) : 'text-slate-600')}>
+                {result?.sentiment || 'IDLE'}
               </p>
             </div>
-            <div className={cn("card p-4 border-l-2", result ? actionBg(result.moderation_action) : '')}>
+            <div className="card p-4">
+              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1.5">Primary Intent</p>
+              <p className="text-xl text-white font-mono font-bold capitalize truncate">
+                {result ? result.primary_intent.replace(/_/g, ' ') : '--'}
+              </p>
+            </div>
+            <div className="card p-4">
               <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1.5">Action</p>
-              <p className={cn("text-xl font-mono font-bold", result ? actionColor(result.moderation_action) : 'text-slate-600')}>
-                {result?.moderation_action || 'IDLE'}
-              </p>
-            </div>
-            <div className="card p-4">
-              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1.5">Latency</p>
-              <p className="text-xl text-cyan-400 font-mono font-bold">
-                {result ? `${result.latency_ms}ms` : '--'}
+              <p className="text-xl text-indigo-400 font-mono font-bold">
+                {result?.insight_action || '--'}
               </p>
             </div>
           </div>
+
+          {/* Extracted NLP Data */}
+          <AnimatePresence>
+            {result && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card p-6 space-y-4">
+                <div className="flex items-start gap-2">
+                  <MessageSquare className="w-4 h-4 text-indigo-400 mt-0.5" />
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Discourse Summary</h3>
+                    <p className="text-sm text-slate-300">{result.nlp.discourse_summary}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 pt-2 border-t border-brand-border">
+                  <Tag className="w-4 h-4 text-blue-400 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Topics & Keywords</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {result.nlp.topics.map(t => (
+                        <span key={t} className="tag border-blue-500/20 bg-blue-500/10 text-blue-300">{t}</span>
+                      ))}
+                      {result.nlp.keywords.map(k => (
+                        <span key={k} className="tag">{k}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Right: Results Panel */}
@@ -109,13 +144,13 @@ export default function AnalysisDashboard() {
           <div className="card p-6 flex-1 flex flex-col">
             <h2 className="text-white font-semibold mb-5 flex items-center gap-2 text-sm">
               <Sparkles className="w-4 h-4 text-cyan-400" />
-              Multi-Label Classification
+              Sentiment & Intent Analysis
             </h2>
 
-            <div className="space-y-5 flex-1">
+            <div className="space-y-6 flex-1 overflow-y-auto pr-2">
               {!result && !error && (
                 <div className="h-full flex items-center justify-center text-slate-600 text-sm italic font-mono">
-                  Awaiting inference input...
+                  Awaiting feedback input...
                 </div>
               )}
               {error && (
@@ -123,33 +158,46 @@ export default function AnalysisDashboard() {
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> {error}
                 </div>
               )}
-              <AnimatePresence>
-                {result && Object.entries(result.scores).map(([label, score], i) => (
-                  <motion.div
-                    key={label}
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.06 }}
-                    className="space-y-1.5"
-                  >
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-300 capitalize font-medium">{label.replace(/_/g, ' ')}</span>
-                      <span className="text-white font-mono font-semibold">{(score as number).toFixed(3)}</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-brand-bg rounded-full overflow-hidden border border-brand-border">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(score as number) * 100}%` }}
-                        transition={{ duration: 0.6, delay: i * 0.06 }}
-                        className={cn(
-                          "h-full rounded-full",
-                          (score as number) > 0.7 ? "bg-red-500" : (score as number) > 0.4 ? "bg-amber-500" : "bg-blue-500"
-                        )}
-                      />
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+              
+              {result && (
+                <>
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sentiment Scores</h3>
+                    {Object.entries(result.sentiment_scores).map(([label, score], i) => (
+                      <motion.div key={label} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-300 capitalize font-medium">{label}</span>
+                          <span className="text-white font-mono font-semibold">{(score as number).toFixed(3)}</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-brand-bg rounded-full overflow-hidden border border-brand-border">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${(score as number) * 100}%` }} transition={{ duration: 0.6 }}
+                            className={cn("h-full rounded-full", sentimentBarColor(label))}
+                          />
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-brand-border">
+                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Intent Classification</h3>
+                    {Object.entries(result.intent_scores)
+                      .sort(([,a], [,b]) => (b as number) - (a as number))
+                      .map(([label, score], i) => (
+                      <motion.div key={label} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + (i * 0.05) }} className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-300 capitalize font-medium">{label.replace(/_/g, ' ')}</span>
+                          <span className="text-white font-mono font-semibold">{(score as number).toFixed(3)}</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-brand-bg rounded-full overflow-hidden border border-brand-border">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${(score as number) * 100}%` }} transition={{ duration: 0.6 }}
+                            className="h-full rounded-full bg-indigo-500"
+                          />
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* System Log */}
@@ -165,7 +213,7 @@ export default function AnalysisDashboard() {
                 {isAnalyzing && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-start gap-2">
                     <span className="text-yellow-500 shrink-0">[ML]</span>
-                    <span className="text-slate-400">Running BERT inference...</span>
+                    <span className="text-slate-400">Running sentiment analysis...</span>
                   </motion.div>
                 )}
                 {result && (
@@ -175,14 +223,16 @@ export default function AnalysisDashboard() {
                       <span className="text-slate-400">Inference complete — {result.latency_ms}ms</span>
                     </div>
                     <div className="flex items-start gap-2">
+                      <span className="text-indigo-500 shrink-0">[NLP]</span>
+                      <span className="text-slate-400">Extracted {result.nlp.topics.length} topics, {result.nlp.keywords.length} keywords</span>
+                    </div>
+                    <div className="flex items-start gap-2">
                       <span className="text-yellow-500 shrink-0">[DB]</span>
                       <span className="text-slate-400">Results persisted to Supabase</span>
                     </div>
                     <div className="flex items-start gap-2">
-                      <span className={result.moderation_action === 'BLOCK' ? "text-red-500 shrink-0" : "text-emerald-500 shrink-0"}>
-                        [ACT]
-                      </span>
-                      <span className="text-white">Action: {result.moderation_action} — Severity: {result.severity}</span>
+                      <span className="text-emerald-500 shrink-0">[AI]</span>
+                      <span className="text-white">Sentiment: {result.sentiment} — Intent: {result.primary_intent}</span>
                     </div>
                   </>
                 )}

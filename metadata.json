@@ -1,8 +1,8 @@
 {
-  "name": "Moderato BERT - Real-Time Content Moderation API",
-  "description": "Enterprise-grade content moderation platform using BERT transformers for multi-label toxicity detection, real-time analytics, and automated moderation workflows.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "name": "insightai-customer-intelligence",
+  "title": "Customer Sentiment and Intent Analysis Platform for Business Intelligence",
+  "version": "3.0.0",
+  "description": "AI-powered platform that analyzes customer feedback, reviews, support tickets, and social media to extract sentiment, intent, and actionable business insights using BERT-based NLP.",
+  "author": "InsightAI Team",
+  "stack": ["React", "Vite", "TypeScript", "Tailwind CSS", "Express", "Supabase", "FastAPI", "BERT"]
 }

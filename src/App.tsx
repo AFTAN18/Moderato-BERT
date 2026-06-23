@@ -1,18 +1,13 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- * MODERATO-BERT — ROOT APPLICATION
+ * INSIGHTAI — ROOT APPLICATION
  * ═══════════════════════════════════════════════════════════════
  *
  * APPLICATION FLOW:
  * 1. User lands on LandingPage → clicks "Get Started"
  * 2. User sees AuthPage (Login/Register) → authenticates
  * 3. Authenticated user enters Dashboard with Sidebar navigation
- * 4. Sidebar pages: Monitor | Analytics | History | Model | Settings
- *
- * STATE MANAGEMENT:
- * - App-level: currentPage state + auth state
- * - Per-page: Local state in each component
- * - Auth: localStorage demo bypass + Supabase real auth
+ * 4. Sidebar pages: Analyze | Executive | Analytics | History | AI Insights | Settings
  */
 
 import React, { useState, useEffect } from 'react';
@@ -25,6 +20,7 @@ import ModelPerformance from './components/model/ModelPerformance';
 import SettingsView from './components/settings/SettingsView';
 import LandingPage from './components/landing/LandingPage';
 import AuthPage from './components/auth/AuthPage';
+import ExecutiveDashboard from './components/ExecutiveDashboard';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import type { PageId } from './types';
 
@@ -37,7 +33,7 @@ function AppContent() {
 
   // Check auth state on mount
   useEffect(() => {
-    if (user || localStorage.getItem('moderato_auth')) {
+    if (user || localStorage.getItem('insightai_auth')) {
       setView('app');
     }
   }, [user]);
@@ -46,16 +42,16 @@ function AppContent() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-brand-bg">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-slate-600 font-mono uppercase tracking-widest">Initializing Moderato</p>
+          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-slate-600 font-mono uppercase tracking-widest">Initializing InsightAI</p>
         </div>
       </div>
     );
   }
 
   const handleSignOut = () => {
-    localStorage.removeItem('moderato_auth');
-    localStorage.removeItem('moderato_user');
+    localStorage.removeItem('insightai_auth');
+    localStorage.removeItem('insightai_user');
     signOut();
     setView('landing');
   };
@@ -74,11 +70,24 @@ function AppContent() {
   const renderPage = () => {
     switch (activeTab) {
       case 'dashboard': return <AnalysisDashboard />;
+      case 'executive': return <ExecutiveDashboard />;
       case 'analytics': return <AnalyticsView />;
       case 'history': return <HistoryView />;
       case 'model': return <ModelPerformance />;
       case 'settings': return <SettingsView />;
       default: return <AnalysisDashboard />;
+    }
+  };
+
+  const getBreadcrumb = () => {
+    switch (activeTab) {
+      case 'dashboard': return 'Feedback Analysis Lab';
+      case 'executive': return 'Executive Summary';
+      case 'analytics': return 'Customer Analytics';
+      case 'history': return 'Feedback History';
+      case 'model': return 'AI Model Performance';
+      case 'settings': return 'Workspace Settings';
+      default: return activeTab;
     }
   };
 
@@ -92,11 +101,11 @@ function AppContent() {
           <div className="flex items-center gap-2 text-sm">
             <span className="text-slate-600">Production</span>
             <span className="text-slate-700">/</span>
-            <span className="text-white font-medium capitalize">{activeTab === 'dashboard' ? 'Comment Analysis Lab' : activeTab === 'model' ? 'BERT Performance' : activeTab}</span>
+            <span className="text-white font-medium capitalize">{getBreadcrumb()}</span>
           </div>
           <div className="flex items-center gap-5">
             <div className="text-right">
-              <p className="text-[10px] text-slate-600 uppercase font-bold tracking-wider">ML Status</p>
+              <p className="text-[10px] text-slate-600 uppercase font-bold tracking-wider">AI Status</p>
               <p className="text-xs text-emerald-400 font-mono font-semibold">OPERATIONAL</p>
             </div>
             <div className="w-px h-6 bg-brand-border" />
@@ -134,7 +143,7 @@ function AppContent() {
               GPU: 42% UTILIZATION
             </div>
           </div>
-          <div>BUILD v2.4.12-STABLE // MODERATO-BERT</div>
+          <div>BUILD v3.0.0-STABLE // INSIGHTAI — CUSTOMER INTELLIGENCE</div>
         </footer>
       </main>
     </div>

@@ -1,148 +1,127 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
-import { BrainCircuit, TrendingUp, Activity, Clock, Target, Award } from 'lucide-react';
+import { BrainCircuit, Activity, Cpu, Network, CheckCircle2 } from 'lucide-react';
 import { api } from '@/src/lib/api';
 import { cn } from '@/src/lib/utils';
+import type { ModelPerformanceData } from '@/src/types';
+import { ResponsiveContainer, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, RadarChart, Tooltip } from 'recharts';
 
 export default function ModelPerformance() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ModelPerformanceData | null>(null);
 
   useEffect(() => {
-    api.getModelMetrics().then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+    api.getModelMetrics().then(setData).catch(console.error);
   }, []);
 
-  if (loading) {
+  if (!data) {
     return (
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="grid grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="skeleton h-28 rounded-xl" />)}
+          {[...Array(4)].map((_, i) => <div key={i} className="skeleton h-24 rounded-xl" />)}
         </div>
-        <div className="skeleton h-[400px] rounded-xl" />
+        <div className="grid grid-cols-2 gap-6">
+          <div className="skeleton h-[400px] rounded-xl" />
+          <div className="skeleton h-[400px] rounded-xl" />
+        </div>
       </div>
     );
   }
 
-  const { current, history, roc_auc } = data;
-  const metrics = [
-    { label: 'Accuracy', value: (current.accuracy * 100).toFixed(1) + '%', icon: Target, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/15' },
-    { label: 'Precision', value: (current.precision_score * 100).toFixed(1) + '%', icon: Award, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/15' },
-    { label: 'Recall', value: (current.recall * 100).toFixed(1) + '%', icon: TrendingUp, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/15' },
-    { label: 'F1 Score', value: (current.f1_score * 100).toFixed(1) + '%', icon: Activity, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/15' },
-  ];
-
-  const radarData = Object.entries(roc_auc).map(([label, score]) => ({
-    label: label.replace(/_/g, ' '),
-    value: (score as number) * 100,
-  }));
-
-  const versionData = history.map((h: any) => ({
-    version: h.model_version,
-    accuracy: +(h.accuracy * 100).toFixed(1),
-    f1: +(h.f1_score * 100).toFixed(1),
-    latency: h.avg_latency_ms,
+  const radarData = Object.entries(data.roc_auc).map(([key, value]) => ({
+    subject: key.replace(/_/g, ' '),
+    A: value * 100,
+    fullMark: 100,
   }));
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Model Performance</h1>
-          <p className="text-slate-500 text-sm mt-1">BERT transformer metrics and ROC-AUC analysis.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">AI Insight Metrics</h1>
+          <p className="text-slate-500 text-sm mt-1">Sentiment & intent model performance metrics.</p>
         </div>
-        <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="px-3 py-1.5 bg-brand-card border border-brand-border rounded-lg text-slate-400">
-            {current.model_version}
-          </span>
-          <span className="px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400">
-            {current.total_inferences.toLocaleString()} inferences
-          </span>
+        <div className="flex items-center gap-2 bg-brand-bg border border-brand-border px-3 py-1.5 rounded-lg">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[10px] text-slate-400 font-mono">MODEL: {data.current.model_version.toUpperCase()}</span>
         </div>
       </header>
 
-      {/* Metric Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {metrics.map((m, i) => (
-          <motion.div key={m.label} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-            className="card p-5 flex items-start gap-4">
-            <div className={`p-2.5 rounded-lg border ${m.bg} ${m.color}`}>
-              <m.icon className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</p>
-              <p className="text-2xl font-bold text-white mt-0.5 tracking-tight">{m.value}</p>
-            </div>
+        {[
+          { label: 'Accuracy', value: (data.current.accuracy * 100).toFixed(1) + '%', color: 'text-indigo-400' },
+          { label: 'Precision', value: (data.current.precision_score * 100).toFixed(1) + '%', color: 'text-blue-400' },
+          { label: 'Recall', value: (data.current.recall * 100).toFixed(1) + '%', color: 'text-cyan-400' },
+          { label: 'F1 Score', value: (data.current.f1_score * 100).toFixed(1) + '%', color: 'text-emerald-400' },
+        ].map((kpi, i) => (
+          <motion.div key={kpi.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="card p-5">
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{kpi.label}</h3>
+            <p className={cn("text-2xl font-bold font-mono mt-1", kpi.color)}>{kpi.value}</p>
           </motion.div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Version History Line Chart */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-          className="card p-6 h-[400px] flex flex-col">
+        {/* ROC AUC Radar */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6 flex flex-col h-[400px]">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <TrendingUp className="w-3.5 h-3.5" /> Version Performance Trend
+            <Activity className="w-4 h-4 text-indigo-400" /> Class-wise ROC-AUC Score
           </h3>
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 -mt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={versionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1C1C1F" />
-                <XAxis dataKey="version" stroke="#475569" fontSize={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={10} axisLine={false} tickLine={false} domain={[90, 100]} />
-                <Tooltip contentStyle={{ backgroundColor: '#111113', border: '1px solid #1C1C1F', borderRadius: '8px', fontSize: '11px' }} />
-                <Line type="monotone" dataKey="accuracy" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} />
-                <Line type="monotone" dataKey="f1" stroke="#06b6d4" strokeWidth={2} dot={{ fill: '#06b6d4', r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex items-center gap-6 mt-3">
-            <span className="flex items-center gap-2 text-[11px] text-slate-500"><div className="w-3 h-0.5 bg-blue-500 rounded" /> Accuracy</span>
-            <span className="flex items-center gap-2 text-[11px] text-slate-500"><div className="w-3 h-0.5 bg-cyan-500 rounded" /> F1 Score</span>
-          </div>
-        </motion.div>
-
-        {/* ROC-AUC Radar */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-          className="card p-6 h-[400px] flex flex-col">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <BrainCircuit className="w-3.5 h-3.5" /> Per-Label ROC-AUC
-          </h3>
-          <div className="flex-1 min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData}>
+              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                 <PolarGrid stroke="#1C1C1F" />
-                <PolarAngleAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 10 }} />
-                <PolarRadiusAxis domain={[95, 100]} tick={{ fill: '#475569', fontSize: 9 }} axisLine={false} />
-                <Radar dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} strokeWidth={2} />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 10, className: 'capitalize' }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#475569', fontSize: 10 }} />
+                <Radar name="ROC-AUC" dataKey="A" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} />
+                <Tooltip contentStyle={{ backgroundColor: '#111113', border: '1px solid #1C1C1F', borderRadius: '8px', fontSize: '11px' }} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
-      </div>
 
-      {/* Model Info */}
-      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-        className="card p-6">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Model Architecture</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: 'Architecture', value: 'BERT Base Uncased' },
-            { label: 'Parameters', value: '110M' },
-            { label: 'Hidden Layers', value: '12' },
-            { label: 'Attention Heads', value: '12' },
-            { label: 'Max Sequence', value: '512 tokens' },
-            { label: 'Output Labels', value: '6 categories' },
-            { label: 'Activation', value: 'Sigmoid' },
-            { label: 'Avg Latency', value: `${current.avg_latency_ms}ms` },
-          ].map(item => (
-            <div key={item.label} className="bg-brand-bg border border-brand-border rounded-lg p-3">
-              <p className="text-[10px] text-slate-600 uppercase tracking-wider">{item.label}</p>
-              <p className="text-sm text-white font-medium mt-1">{item.value}</p>
+        {/* Model Arch */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card p-6 flex flex-col h-[400px]">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+            <Network className="w-4 h-4 text-blue-400" /> Sentiment Engine Architecture
+          </h3>
+          <div className="flex-1 space-y-6">
+            <div className="p-4 bg-brand-bg rounded-lg border border-brand-border flex items-start gap-4">
+              <BrainCircuit className="w-6 h-6 text-indigo-400 mt-1" />
+              <div>
+                <h4 className="text-sm font-semibold text-white">Transformer Backbone</h4>
+                <p className="text-xs text-slate-400 mt-1">nlptown/bert-base-multilingual-uncased-sentiment</p>
+                <div className="flex gap-4 mt-3 text-[10px] font-mono text-slate-500">
+                  <span>LAYERS: 12</span>
+                  <span>HEADS: 12</span>
+                  <span>PARAMS: 110M</span>
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
-      </motion.div>
+            
+            <div className="p-4 bg-brand-bg rounded-lg border border-brand-border flex items-start gap-4">
+              <Cpu className="w-6 h-6 text-blue-400 mt-1" />
+              <div>
+                <h4 className="text-sm font-semibold text-white">Classification Head</h4>
+                <p className="text-xs text-slate-400 mt-1">Multi-label sequence classification with NLP enrichments</p>
+                <div className="flex gap-4 mt-3 text-[10px] font-mono text-slate-500">
+                  <span>OUT: 11 CATEGORIES (3 Sentiment + 8 Intent)</span>
+                  <span>ACT: SOFTMAX + SIGMOID</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-emerald-500/5 rounded-lg border border-emerald-500/20 flex items-start gap-4">
+              <CheckCircle2 className="w-6 h-6 text-emerald-400 mt-1" />
+              <div>
+                <h4 className="text-sm font-semibold text-white">Production Ready</h4>
+                <p className="text-xs text-slate-400 mt-1">Model is currently handling 100% of production traffic.</p>
+                <p className="text-xs text-emerald-500 font-mono mt-2">AVG LATENCY: {data.current.avg_latency_ms}ms</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }

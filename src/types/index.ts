@@ -1,21 +1,29 @@
 /**
  * CORE TYPE DEFINITIONS
  * 
- * All shared TypeScript interfaces for the Moderato-BERT platform.
+ * All shared TypeScript interfaces for the InsightAI Customer Intelligence platform.
  * These types are used across frontend components, API hooks, and service layers.
  */
 
 // ─── ML Inference Types ───────────────────────────────────────
 
-export type ToxicityLabel = 'toxic' | 'severe_toxic' | 'obscene' | 'threat' | 'insult' | 'identity_hate';
-export type Severity = 'low' | 'medium' | 'high';
-export type ModerationAction = 'ALLOW' | 'FLAG' | 'BLOCK';
+export type SentimentLabel = 'positive' | 'negative' | 'neutral';
+export type IntentLabel = 'purchase_intent' | 'complaint' | 'inquiry' | 'support_request' | 'product_feedback' | 'feature_request' | 'churn_risk' | 'recommendation';
+export type InsightAction = 'MONITOR' | 'ESCALATE' | 'ENGAGE';
+
+export interface NLPEnrichment {
+  topics: string[];
+  keywords: string[];
+  discourse_summary: string;
+}
 
 export interface AnalysisResult {
-  labels: ToxicityLabel[];
-  scores: Record<ToxicityLabel, number>;
-  severity: Severity;
-  moderation_action: ModerationAction;
+  sentiment: SentimentLabel;
+  sentiment_scores: Record<SentimentLabel, number>;
+  intent_scores: Record<IntentLabel, number>;
+  primary_intent: IntentLabel;
+  insight_action: InsightAction;
+  nlp: NLPEnrichment;
   latency_ms: number;
   timestamp: string;
   original_text: string;
@@ -28,27 +36,34 @@ export interface UserProfile {
   full_name: string | null;
   avatar_url: string | null;
   organization_name: string | null;
-  role: 'admin' | 'moderator' | 'viewer';
+  department: string | null;
+  role: 'admin' | 'analyst' | 'viewer';
   created_at: string;
   updated_at: string;
 }
 
-export interface CommentPrediction {
+export interface CustomerFeedbackAnalysis {
   id: number;
   user_id: string;
-  original_text: string;
+  customer_text: string;
   cleaned_text: string;
-  severity: Severity;
-  action: ModerationAction;
-  latency_ms: number;
-  scores: Record<ToxicityLabel, number>;
-  created_at: string;
+  sentiment: SentimentLabel;
+  sentiment_score: number;
+  primary_intent: IntentLabel;
+  intent_confidence: number;
+  extracted_topics: string[];
+  keywords: string[];
+  discourse_summary: string;
+  insight_action: InsightAction;
+  processing_latency: number;
+  analysis_timestamp: string;
 }
 
-export interface PredictionLabel {
+export interface SentimentIntentLabel {
   id: number;
-  prediction_id: number;
-  label_name: ToxicityLabel;
+  analysis_id: number;
+  label_type: 'sentiment' | 'intent';
+  label_name: string;
   confidence_score: number;
 }
 
@@ -56,19 +71,20 @@ export interface AnalyticsSnapshot {
   id: number;
   snapshot_date: string;
   total_requests: number;
-  blocked_requests: number;
-  flagged_requests: number;
-  allowed_requests: number;
+  positive_count: number;
+  negative_count: number;
+  neutral_count: number;
+  intent_distribution: Record<IntentLabel, number>;
   avg_latency: number;
-  label_distribution: Record<ToxicityLabel, number>;
+  avg_satisfaction_score: number;
 }
 
-export interface ModerationLog {
+export interface InsightLog {
   id: number;
-  prediction_id: number;
-  moderator_id: string;
-  original_action: ModerationAction;
-  new_action: ModerationAction;
+  analysis_id: number;
+  analyst_id: string;
+  original_sentiment: SentimentLabel;
+  corrected_sentiment: SentimentLabel;
   reason: string;
   created_at: string;
 }
@@ -89,8 +105,9 @@ export interface UserSettings {
   user_id: string;
   theme: 'dark' | 'light' | 'system';
   email_notifications: boolean;
-  sensitivity_level: 'low' | 'medium' | 'high';
-  auto_block_threshold: number;
+  analysis_depth: 'basic' | 'standard' | 'deep';
+  negative_alert_threshold: number;
+  churn_risk_threshold: number;
   custom_rules: Record<string, unknown>;
 }
 
@@ -110,30 +127,36 @@ export interface ApiResponse<T> {
 
 export interface AnalyticsData {
   total_analyzed: number;
-  toxic_ratio: number;
-  severity_distribution: { low: number; medium: number; high: number };
+  positive_ratio: number;
+  negative_ratio: number;
+  neutral_ratio: number;
+  satisfaction_index: number;
   latency_avg_ms: number;
-  action_distribution: { ALLOW: number; FLAG: number; BLOCK: number };
+  sentiment_distribution: { positive: number; negative: number; neutral: number };
+  intent_distribution: Record<string, number>;
   daily_stats: DailyStat[];
-  label_frequency: Record<ToxicityLabel, number>;
   recent_trend: 'up' | 'down' | 'stable';
 }
 
 export interface DailyStat {
   date: string;
   count: number;
-  toxic: number;
-  blocked: number;
+  positive: number;
+  negative: number;
+  neutral: number;
   avg_latency: number;
 }
 
 export interface HistoryEntry {
   id: number;
   text: string;
-  severity: Severity;
-  action: ModerationAction;
-  scores: Record<string, number>;
-  labels: string[];
+  sentiment: SentimentLabel;
+  primary_intent: IntentLabel;
+  insight_action: InsightAction;
+  sentiment_scores: Record<string, number>;
+  intent_scores: Record<string, number>;
+  topics: string[];
+  keywords: string[];
   latency_ms: number;
   timestamp: string;
 }
@@ -141,13 +164,23 @@ export interface HistoryEntry {
 export interface ModelPerformanceData {
   current: ModelMetrics;
   history: ModelMetrics[];
-  confusion_matrix: number[][];
-  roc_auc: Record<ToxicityLabel, number>;
+  roc_auc: Record<string, number>;
+}
+
+export interface ExecutiveDashboard {
+  health_score: number;
+  satisfaction_index: number;
+  purchase_interest_index: number;
+  pain_points: { topic: string; count: number; sentiment_avg: number }[];
+  trending_topics: { topic: string; count: number; trend: 'up' | 'down' | 'stable' }[];
+  top_concerns: { text: string; sentiment: SentimentLabel; intent: IntentLabel }[];
+  improvement_suggestions: string[];
+  sentiment_trend: { date: string; positive: number; negative: number; neutral: number }[];
 }
 
 // ─── Component Prop Types ─────────────────────────────────────
 
-export type PageId = 'landing' | 'dashboard' | 'analytics' | 'history' | 'model' | 'settings';
+export type PageId = 'landing' | 'dashboard' | 'analytics' | 'history' | 'model' | 'executive' | 'settings';
 
 export interface NavItem {
   id: PageId;
