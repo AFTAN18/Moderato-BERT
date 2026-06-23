@@ -5,4 +5,5 @@ node_modules
 dist
 coverage
 *.log
+ml-service/
 ml-service/__pycache__
